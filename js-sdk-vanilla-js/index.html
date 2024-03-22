@@ -1,0 +1,136 @@
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="initial-scale=1,maximum-scale=1,user-scalable=no"
+    />
+    <title>Sketch widget | Sample | ArcGIS Maps SDK for JavaScript 4.29</title>
+
+    <link
+      rel="stylesheet"
+      href="https://js.arcgis.com/4.29/esri/themes/light/main.css"
+    />
+    <script src="https://js.arcgis.com/4.29/"></script>
+
+    <style>
+      html,
+      body,
+      #viewDiv {
+        padding: 0;
+        margin: 0;
+        height: 100%;
+        width: 100%;
+      }
+    </style>
+    <script>
+      require([
+        "esri/widgets/Sketch",
+        "esri/Map",
+        "esri/Graphic",
+        "esri/layers/FeatureLayer",
+        "esri/layers/GraphicsLayer",
+        "esri/views/MapView",
+        "esri/geometry/geometryEngineAsync",
+      ], (
+        Sketch,
+        Map,
+        Graphic,
+        FeatureLayer,
+        GraphicsLayer,
+        MapView,
+        geometryEngineAsync
+      ) => {
+        const featureLayer = new FeatureLayer({
+          portalItem: {
+            id: "83c37666a059480bb8a7cb73f449ff52",
+          },
+          outFields: ["*"],
+        });
+
+        const graphicsLayer = new GraphicsLayer({
+          renderer: {
+            type: "simple",
+            symbol: {
+              type: "simple-fill",
+              color: [227, 139, 79, 0.8],
+              outline: {
+                color: [255, 255, 255],
+                width: 1,
+              },
+            },
+          },
+        });
+
+        const map = new Map({
+          basemap: "topo-vector",
+          layers: [featureLayer, graphicsLayer],
+        });
+
+        const view = new MapView({
+          container: "viewDiv",
+          map: map,
+          zoom: 11,
+          center: [-122.083, 37.3069],
+        });
+
+        view.when(() => {
+          const sketch = new Sketch({
+            layer: graphicsLayer,
+            view: view,
+            // graphic will be selected as soon as it is created
+            creationMode: "update",
+          });
+
+          view.ui.add(sketch, "top-right");
+
+          sketch.on("create", async function (event) {
+            // check if the create event's state has changed to complete indicating
+            // the graphic create operation is completed.
+            if (event.state === "complete") {
+              console.log("graphic", event.graphic);
+
+              const query = featureLayer.createQuery();
+              query.geometry = event.graphic.geometry;
+
+              const results = await featureLayer.queryFeatures(query);
+
+              console.log("results", results);
+
+              let geoms = [];
+              for (let i = 0; i < results.features.length; i++) {
+                const feature = results.features[i];
+                geoms.push(feature.geometry);
+              }
+
+              const intResult = await geometryEngineAsync.intersect(
+                geoms,
+                event.graphic.geometry
+              );
+              //   console.log(intResult);
+              for (let i = 0; i < intResult.length; i++) {
+                graphicsLayer.add(
+                  new Graphic({
+                    geometry: intResult[i],
+                    symbol: {
+                      type: "simple-fill",
+                      color: [255, 0, 0, 0.8],
+                      outline: {
+                        color: [255, 255, 255],
+                        width: 1,
+                      },
+                    },
+                  })
+                );
+              }
+            }
+          });
+        });
+      });
+    </script>
+  </head>
+
+  <body>
+    <div id="viewDiv"></div>
+  </body>
+</html>
